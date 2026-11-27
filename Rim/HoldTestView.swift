@@ -19,7 +19,7 @@ struct HoldTestView: View {
                 TimelineView(.animation(paused: start == nil)) { timeline in
                     let elapsed = start.map { timeline.date.timeIntervalSince($0) } ?? 0
                     ZStack {
-                        Backdrop(colors: colors, full: min(elapsed / 60, 1), date: timeline.date, still: reduceMotion)
+                        Backdrop(colors: PatternID.rounds.backdrop, full: min(elapsed / 60, 1), date: timeline.date, still: reduceMotion)
                         RingCanvas(
                             ring: ring, radius: RingPath.screenRadius(proxy), colors: colors, style: .trace, date: timeline.date,
                             trail: min(elapsed, 59), intensity: start == nil ? 0.5 : 1, still: reduceMotion

@@ -36,11 +36,11 @@ static half3 palette(float t, half4 c0, half4 c1, half4 c2) {
         float2 point = float2(trail[i], trail[i + 1]);
         float w = trail[i + 2];
         float d = distance(position, point);
-        float g = w * exp(-(d * d) / (2.0 * 46.0 * 46.0));
+        float g = w * exp(-(d * d) / (2.0 * 40.0 * 40.0));
         energy = max(energy, g);
         if (i == 0) {
             head = w * exp(-(d * d) / (2.0 * 22.0 * 22.0));
-            swell = w * exp(-(d * d) / (2.0 * 60.0 * 60.0));
+            swell = w * exp(-(d * d) / (2.0 * 48.0 * 48.0));
         }
     }
     float lit = max(energy, pulse);

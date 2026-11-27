@@ -5,7 +5,11 @@ struct BreatheView: View {
     @Environment(Session.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragX: CGFloat = 0
-    @State private var direction: Edge = .trailing
+    /// The pattern being blended away from, so colours and light cross over in one smooth pass.
+    @State private var summaryClosed: Date?
+    @State private var blendFrom: PatternID?
+    @State private var blendStart = Date.distantPast
+    @State private var blendEpoch = Date.now
     @State private var showSettings = false
     @State private var editing: Pattern?
     @State private var holdTest = false
@@ -54,12 +58,13 @@ struct BreatheView: View {
                 let holdable = mode == .idle || mode == .summary || (mode == .welcome && welcomeStep == 2)
                 if pressing, holdable {
                     pressStart = .now
+                    session.holdHaptic(strength: store.prefs.haptics, duration: Self.holdDuration)
                 } else if pressStart != nil {
                     afterglow = (.now, fill(.now), 0.4)
                     pressStart = nil
+                    session.cancelHaptics()
                 }
             }
-            .sensoryFeedback(trigger: pressStart) { _, new in new == nil ? nil : .impact(weight: .light) }
             .gesture(swipe)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(spoken)
@@ -81,8 +86,23 @@ struct BreatheView: View {
             )
         }
         .fullScreenCover(isPresented: $calibrating) { CalibrateView(pattern: store.selected) }
-        .fullScreenCover(item: $editing) { EditorView(pattern: $0) }
+        .sheet(item: $editing) { EditorView(pattern: $0) }
         .fullScreenCover(isPresented: $holdTest) { HoldTestView() }
+        .onChange(of: session.summary?.id) { old, new in
+            if old != nil, new == nil { summaryClosed = .now }
+            if new != nil { summaryClosed = nil }
+        }
+        .onChange(of: session.state) { old, new in
+            // Every start gets the hold-to-begin flash, however it was started.
+            let recent = afterglow.map { Date.now.timeIntervalSince($0.date) < 0.3 } ?? false
+            if old == .idle, new == .running, !recent { afterglow = (.now, 0.8, 1.3) }
+        }
+        .onChange(of: pattern.id) { old, _ in
+            blendFrom = old
+            blendStart = .now
+            blendEpoch = epoch
+            epoch = .now
+        }
         .onChange(of: store.prefs.onboarded) { _, done in
             if !done { welcomeStep = 0 }
         }
@@ -117,36 +137,59 @@ struct BreatheView: View {
             ? { session.moment(at: $0) }
             : closing ? finaleSample : { preview.moment($0.timeIntervalSince(epoch)) }
         let now = sample(clock)
-        let trail = closing ? 0.6 : style == .trace ? min(preview.total * 0.92, 20) : 1.4
+        let trail = closing ? 0.6 : style == .trace ? min(preview.total * 0.92, 20) : 1.15
 
         let rounds = live && pattern.id == .rounds
         let fade = sleepFade
+        let k = blend(date)
+        let from = k < 1 ? blendFrom : nil
+        // The light goes dark at the crossover and comes back on the new pattern, so it never jumps.
+        let dip = from == nil ? 1 : 1 - sin(.pi * k)
+        let falling = collapse(at: date)
         ZStack {
             Backdrop(
-                colors: pattern.id.colors, full: now?.full ?? 0, date: date, still: reduceMotion,
-                head: now.map { ring.point($0.u) } ?? .zero,
+                colors: mixed(from?.backdrop, pattern.id.backdrop, k), full: now?.full ?? 0, date: date, still: reduceMotion,
+                head: falling > 0 && session.summary != nil ? ring.point(session.endU) : now.map { ring.point($0.u) } ?? .zero,
                 pull: now == nil || now?.pulse == true || reduceMotion ? 0
-                    : (live || closing ? 0.2 + 0.3 * (now?.full ?? 0) : 0.15)
+                    : (live || closing ? 0.2 + 0.3 * (now?.full ?? 0) : 0.15),
+                collapse: falling
             )
-                .id(pattern.id)
-                .transition(.opacity)
             RingCanvas(
-                ring: ring, radius: radius, colors: colors, style: style, date: clock, trail: trail,
-                intensity: (mode == .running || closing ? 1 : mode == .paused ? 0.45 : mode == .welcome ? 0.85 : 0.55) * fade,
+                ring: ring, radius: radius, colors: mixed(from.map { store.colors($0) }, colors, k), style: style,
+                date: clock, trail: trail,
+                intensity: (mode == .running || closing ? 1 : mode == .paused ? 0.45 : mode == .welcome ? 0.85 : 0.55)
+                    * fade * dip * (1 - 0.85 * falling),
                 dots: store.prefs.count == .dots && live ? session.breaths : 0,
                 marks: rounds ? session.holds.map { 0.125 + $0 / 60 } : [],
                 best: rounds ? bestHold.map { 0.125 + $0 / 60 } : nil,
                 progress: live ? session.progress : nil,
                 flash: flash(at: date),
                 still: reduceMotion,
-                sample: sample
+                sample: from != nil && k < 0.5 && !live && !closing ? oldSample : sample
             )
-            .id(pattern.id)
-            .transition(.opacity)
             center(date: date)
                 .padding(.horizontal, 40)
             Color.black.opacity((1 - fade) * 0.94).allowsHitTesting(false)
         }
+    }
+
+    // MARK: Blending between patterns
+
+    private static let blendLength = 0.6
+
+    private func blend(_ date: Date) -> Double {
+        Self.smooth(date.timeIntervalSince(blendStart) / Self.blendLength)
+    }
+
+    private func mixed(_ from: [Color]?, _ to: [Color], _ k: Double) -> [Color] {
+        guard let from, k < 1 else { return to }
+        return zip(from, to).map { $0.mix(with: $1, by: k) }
+    }
+
+    /// Until the crossover, the light keeps playing the pattern you swiped away from.
+    private func oldSample(_ date: Date) -> Moment? {
+        guard let blendFrom else { return nil }
+        return Preview(store.pattern(blendFrom), pace: store.pace(blendFrom)).moment(date.timeIntervalSince(blendEpoch))
     }
 
     /// The best Wim Hof hold ever, from history and this session.
@@ -190,6 +233,16 @@ struct BreatheView: View {
 
     // MARK: Closing
 
+    /// After the end bloom the gradient falls into the light and the screen sinks to near-black;
+    /// when the details are dismissed, it rises back.
+    private func collapse(at date: Date) -> Double {
+        if session.summary != nil, let finished = session.finishedAt {
+            return Self.smooth((date.timeIntervalSince(finished) - 0.35) / 1.6)
+        }
+        if let closed = summaryClosed { return 1 - Self.smooth(date.timeIntervalSince(closed) / 1.0) }
+        return 0
+    }
+
     private static let finaleLength = 2.2
 
     /// Seconds since the session ended, while the closing animation is still playing.
@@ -226,8 +279,8 @@ struct BreatheView: View {
                         }
                         .padding(.top, 22)
                         .id(pattern.id)
-                        .transition(.nudge(from: direction, reduceMotion: reduceMotion))
-                        .offset(x: dragX)
+                        .transition(.focus(reduceMotion: reduceMotion))
+                        .modifier(DragSoften(x: dragX, reduceMotion: reduceMotion))
                     }
                 }
                 .multilineTextAlignment(.center)
@@ -242,7 +295,7 @@ struct BreatheView: View {
                         .opacity(0.75)
                 }
                 .transition(.swap(reduceMotion: reduceMotion))
-            case .summary where (finaleAge(date) ?? .infinity) < 0.2:
+            case .summary where (finaleAge(date) ?? .infinity) < 1.1:
                 EmptyView()
             case .summary:
                 if urgeSummary {
@@ -265,9 +318,8 @@ struct BreatheView: View {
                         .padding(.top, 18)
                 }
                 .id(pattern.id)
-                .transition(.nudge(from: direction, reduceMotion: reduceMotion))
-                .offset(x: dragX)
-                .opacity(1 - min(abs(dragX) / 500, 0.5))
+                .transition(.focus(reduceMotion: reduceMotion))
+                .modifier(DragSoften(x: dragX, reduceMotion: reduceMotion))
             case .running, .paused:
                 if let entry = session.current { running(entry, date: date) }
             }
@@ -316,11 +368,14 @@ struct BreatheView: View {
                     .scaledFont(22, .semibold).monospacedDigit()
                     .contentTransition(.numericText())
                     .opacity(0.6)
-            } else if store.prefs.count == .number, session.breaths > 0 {
-                Text("\(session.breaths)")
-                    .font(.callout.weight(.semibold).monospacedDigit())
+            } else if store.prefs.count == .number, let seconds = step.seconds {
+                // Counts the seconds of the phase: 1, 2, 3, 4.
+                let n = min(Int(session.clock.timeIntervalSince(entry.start)) + 1, Int(seconds.rounded(.up)))
+                Text("\(n)")
+                    .scaledFont(26, .semibold).monospacedDigit()
                     .contentTransition(.numericText())
-                    .opacity(0.5)
+                    .animation(.smooth(duration: 0.3), value: n)
+                    .opacity(0.65)
             }
         }
     }
@@ -378,9 +433,9 @@ struct BreatheView: View {
     private static let welcome: [(title: String, body: String)] = [
         ("Follow the light.", "It travels the edge of your screen, one breath at a time."),
         ("Feel the phone.", "It swells as you breathe in and settles as you breathe out."),
-        ("Hold to begin.", "Press and hold anywhere to try it. Tap to pause once you're breathing."),
-        ("Choose a rhythm.", "Swipe to look around. Steady is a good place to start."),
-        ("A nudge each evening?", "One quiet reminder at 9 pm. Change it anytime in Settings."),
+        ("Hold to begin.", "Press and hold anywhere. Tap anytime to pause."),
+        ("Choose a rhythm.", "Swipe to look around."),
+        ("A nudge each evening?", "One reminder at 9 pm."),
     ]
 
     private func advanceWelcome() {
@@ -583,7 +638,9 @@ struct BreatheView: View {
         switch mode {
         case .idle, .summary: begin(pattern)
         case .running: session.pause()
-        case .welcome where welcomeStep == 2: advanceWelcome()
+        case .welcome where welcomeStep == 2:
+            session.landHaptic()
+            advanceWelcome()
         case .paused, .welcome, .safety: break
         }
     }
@@ -646,11 +703,9 @@ struct BreatheView: View {
     private func shift(_ delta: Int) {
         let all = PatternID.carousel
         guard let i = all.firstIndex(of: store.prefs.selected), all.indices.contains(i + delta) else { return }
-        direction = delta > 0 ? .trailing : .leading
-        withAnimation(.smooth(duration: 0.5)) {
+        withAnimation(.smooth(duration: 0.45)) {
             session.summary = nil
             store.prefs.selected = all[i + delta]
-            epoch = .now
         }
     }
 
@@ -660,18 +715,23 @@ struct BreatheView: View {
     }
 }
 
-/// The numbers after a session, drifting in a line at a time as the closing bloom settles.
+/// The session's details on the darkened screen: lines rise into focus one after another,
+/// and the time and breath count roll up from zero.
 struct SummaryText: View {
     let summary: Session.Summary
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
+    @State private var seconds = 0.0
+    @State private var breaths = 0
 
     var body: some View {
-        VStack(spacing: 10) {
-            reveal(0, Text(Duration.seconds(summary.seconds).formatted(.time(pattern: .minuteSecond)))
-                .scaledFont(60, .regular).monospacedDigit())
-            reveal(1, Text("^[\(summary.breaths) breath](inflect: true)")
-                .font(.title3.weight(.medium)))
+        VStack(spacing: 12) {
+            reveal(0, Text(Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond)))
+                .scaledFont(64, .regular).monospacedDigit()
+                .contentTransition(.numericText()))
+            reveal(1, Text("^[\(breaths) breath](inflect: true)")
+                .font(.title3.weight(.medium))
+                .contentTransition(.numericText()))
             if !summary.holds.isEmpty {
                 reveal(2, Text("Holds \(summary.holds.map { Duration.seconds($0).formatted(.time(pattern: .minuteSecond)) }.formatted(.list(type: .and)))")
                     .font(.subheadline.weight(.medium).monospacedDigit())
@@ -682,16 +742,36 @@ struct SummaryText: View {
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .opacity(0.75))
             }
-            reveal(4, Text(summary.pattern.name).font(.subheadline).opacity(0.5))
+            reveal(4, Text(summary.pattern.name).font(.subheadline.weight(.medium)).opacity(0.5))
         }
-        .onAppear { shown = true }
+        .onAppear {
+            shown = true
+            withAnimation(.easeOut(duration: reduceMotion ? 0 : 1.1).delay(0.15)) {
+                seconds = summary.seconds
+                breaths = summary.breaths
+            }
+        }
     }
 
     private func reveal(_ order: Int, _ line: some View) -> some View {
         line
             .opacity(shown ? 1 : 0)
-            .blur(radius: shown || reduceMotion ? 0 : 4)
-            .offset(y: shown || reduceMotion ? 0 : 12)
-            .animation(.easeOut(duration: 0.4).delay(0.1 * Double(order)), value: shown)
+            .blur(radius: shown || reduceMotion ? 0 : 6)
+            .offset(y: shown || reduceMotion ? 0 : 16)
+            .scaleEffect(shown || reduceMotion ? 1 : 0.97)
+            .animation(.easeOut(duration: 0.6).delay(0.12 * Double(order)), value: shown)
+    }
+}
+
+/// While you drag between patterns, the name softens with your finger and drifts only slightly.
+private struct DragSoften: ViewModifier {
+    let x: CGFloat
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: reduceMotion ? 0 : x * 0.18)
+            .blur(radius: reduceMotion ? 0 : min(abs(x) / 30, 8))
+            .opacity(1 - min(abs(x) / 260, 0.65))
     }
 }

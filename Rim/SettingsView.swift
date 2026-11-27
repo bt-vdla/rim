@@ -113,7 +113,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("Heart rate from AirPods Pro", isOn: $store.prefs.heartRate)
                 } footer: {
-                    Text("Needs AirPods Pro 3 in your ears during a session.")
+                    Text("Needs AirPods Pro 3.")
                 }
             }
             .navigationTitle("Settings")

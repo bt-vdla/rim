@@ -79,16 +79,13 @@ struct CalibrateView: View {
 
     var body: some View {
         ZStack {
-            Backdrop(colors: store.colors(pattern.id), full: taps.isEmpty ? 0.2 : 0.7, date: .now, still: true)
+            Backdrop(colors: pattern.id.backdrop, full: taps.isEmpty ? 0.2 : 0.7, date: .now, still: true)
                 .animation(.easeOut(duration: 0.3), value: taps.count)
             VStack(spacing: 12) {
                 if let interval {
                     Text("\(String(format: "%.1f", interval)) s a breath")
                         .scaledFont(44, .medium)
                         .monospacedDigit()
-                    Text("\(pattern.name) will run at this pace.")
-                        .font(.body.weight(.medium))
-                        .opacity(0.75)
                 } else {
                     Text("Tap each time you start to breathe in.")
                         .scaledFont(26, .medium)

@@ -16,6 +16,24 @@ enum PatternID: String, Codable, CaseIterable, AppEnum {
     /// The patterns you swipe between. Urge has its own button.
     static var carousel: [PatternID] { allCases.filter { $0 != .urge } }
 
+    /// The breathing gradient behind each pattern: a deep base, two vivid colours and a highlight.
+    var backdrop: [Color] {
+        let hex: [UInt32] = switch self {
+        case .steady: [0x0A1A45, 0x1E6BFF, 0x00C2D1, 0x7A5CFF]
+        case .sleep: [0x120B3A, 0x4B2BD6, 0xB04BD9, 0xFF8A5C]
+        case .balance: [0x05302B, 0x00A88A, 0x2FD27A, 0x1F7AE0]
+        case .reset: [0x3A0A2A, 0xFF4D7D, 0xFF9A4D, 0x8A3CFF]
+        case .unwind: [0x1A1240, 0x6C5CE7, 0xF078C8, 0x3FA9F5]
+        case .triangle: [0x2E1200, 0xFF7A1A, 0xFFC233, 0xE0336B]
+        case .alternate: [0x082426, 0x19D3B0, 0x9B7BFF, 0x4CC9F0]
+        case .energize: [0x2E0606, 0xFF3D3D, 0xFF9F1C, 0xFF2E93]
+        case .rounds: [0x04122E, 0x2E7CF6, 0x6EE7F9, 0xA78BFA]
+        case .custom: [0x1B0F33, 0x8B5CF6, 0xEC4899, 0x22D3EE]
+        case .urge: [0x03222B, 0x00B3A4, 0x3D7BFF, 0x7CE0C3]
+        }
+        return hex.map(Color.init(hex:))
+    }
+
     var colors: [Color] {
         switch self {
         case .steady: [Color(hex: 0x8BE9FF), Color(hex: 0x4C8DFF), Color(hex: 0x8F7BFF)]

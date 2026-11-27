@@ -31,6 +31,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Rim reads your heart rate from AirPods Pro during a session.</string>
 	<key>NSHealthUpdateUsageDescription</key>

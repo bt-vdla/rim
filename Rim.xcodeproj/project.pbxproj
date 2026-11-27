@@ -10,6 +10,7 @@
 		0F6F572322F953CD1CA344A0 /* BreatheView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6D157EEF2785DCF781D945 /* BreatheView.swift */; };
 		297660BD93D2E9C6BFF67E61 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 070090138C173D773BC5A74C /* Store.swift */; };
 		332AC589A173A9E322ED4BEC /* Aurora.metal in Sources */ = {isa = PBXBuildFile; fileRef = F6A54330681B0D1459386807 /* Aurora.metal */; };
+		3926E7D15E9ADEC691EF1631 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 27959383F2D95887B15F3A77 /* PrivacyInfo.xcprivacy */; };
 		3940E26FE71836BA6209DCB9 /* HoldTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88062CAB6AD2FD509DFB2B6 /* HoldTestView.swift */; };
 		418497F586AC2C5CC0130652 /* Shared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B830D9C824AAE5750C93418 /* Shared.swift */; };
 		5B4EBE489FF9125B758069C7 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = D755743D535FC1D01B1D6B5F /* Session.swift */; };
@@ -24,6 +25,7 @@
 		954AADCD4C638664BB27F351 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1446ADD61CB6B3FBD1064E /* EditorView.swift */; };
 		9A3DE06E820284F6E5D06FF2 /* RimApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E4E5F07B75B6AEB86D13FC /* RimApp.swift */; };
 		9FC32E41E0F5F801D92CD5E4 /* Shared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B830D9C824AAE5750C93418 /* Shared.swift */; };
+		C2315D916F72FD0D0F4E52A9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 72AF7EC280D26EACE4C516C8 /* PrivacyInfo.xcprivacy */; };
 		CA3231859625741E80387342 /* Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979D394CB1DE1BB7B02D8227 /* Services.swift */; };
 		CF610842A468589D29E1F8F8 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E539201898020E5F397A068 /* HistoryView.swift */; };
 		DC3B4F22A88B56A0C23571AF /* EdgeLight.metal in Sources */ = {isa = PBXBuildFile; fileRef = 783B7535386EC7A9FB75F03C /* EdgeLight.metal */; };
@@ -59,6 +61,7 @@
 /* Begin PBXFileReference section */
 		070090138C173D773BC5A74C /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
 		1337180E1F67054333C8E0EA /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		27959383F2D95887B15F3A77 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3D1FAC6F34B158FFC4057F7D /* Ring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ring.swift; sourceTree = "<group>"; };
 		3E6D157EEF2785DCF781D945 /* BreatheView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreatheView.swift; sourceTree = "<group>"; };
 		46D88B4D84703E6C574A4A16 /* Pattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pattern.swift; sourceTree = "<group>"; };
@@ -70,6 +73,7 @@
 		6413DFA49451F082FFFDFF38 /* Tone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tone.swift; sourceTree = "<group>"; };
 		64E4E5F07B75B6AEB86D13FC /* RimApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimApp.swift; sourceTree = "<group>"; };
 		6B830D9C824AAE5750C93418 /* Shared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared.swift; sourceTree = "<group>"; };
+		72AF7EC280D26EACE4C516C8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		783B7535386EC7A9FB75F03C /* EdgeLight.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = EdgeLight.metal; sourceTree = "<group>"; };
 		979D394CB1DE1BB7B02D8227 /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
 		9DA9C0A8D344B5733C921BBB /* RimWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimWidgets.swift; sourceTree = "<group>"; };
@@ -98,6 +102,7 @@
 				F88062CAB6AD2FD509DFB2B6 /* HoldTestView.swift */,
 				5E8CD1DB8234968685B2288D /* Motion.swift */,
 				46D88B4D84703E6C574A4A16 /* Pattern.swift */,
+				72AF7EC280D26EACE4C516C8 /* PrivacyInfo.xcprivacy */,
 				64E4E5F07B75B6AEB86D13FC /* RimApp.swift */,
 				3D1FAC6F34B158FFC4057F7D /* Ring.swift */,
 				979D394CB1DE1BB7B02D8227 /* Services.swift */,
@@ -120,6 +125,7 @@
 		D15F2625F56C0137C682A498 /* RimWidgets */ = {
 			isa = PBXGroup;
 			children = (
+				27959383F2D95887B15F3A77 /* PrivacyInfo.xcprivacy */,
 				9DA9C0A8D344B5733C921BBB /* RimWidgets.swift */,
 			);
 			path = RimWidgets;
@@ -172,6 +178,7 @@
 			buildConfigurationList = 0D67DC7BC8C7C38209F0E8FF /* Build configuration list for PBXNativeTarget "RimWidgets" */;
 			buildPhases = (
 				4702926BC74F7B2CC36E4368 /* Sources */,
+				27D9E88DCB5FB3216FD4AD10 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -194,9 +201,11 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					F0E48F0F2F8FEC14C0D5D0B6 = {
+						DevelopmentTeam = P6SP5RHNLV;
 						ProvisioningStyle = Automatic;
 					};
 					FB7D9F5331C7CBFC657227C0 = {
+						DevelopmentTeam = P6SP5RHNLV;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -222,11 +231,20 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		27D9E88DCB5FB3216FD4AD10 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3926E7D15E9ADEC691EF1631 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D1DC3481333D4C7C4DD6E708 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				F88704C6B042CBABE5D75F6B /* Assets.xcassets in Resources */,
+				C2315D916F72FD0D0F4E52A9 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,6 +351,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = P6SP5RHNLV;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -426,6 +445,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = P6SP5RHNLV;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;

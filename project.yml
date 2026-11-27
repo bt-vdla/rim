@@ -13,6 +13,7 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: P6SP5RHNLV
 
 targets:
   Rim:
@@ -34,6 +35,7 @@ targets:
       path: Rim/Info.plist
       properties:
         CFBundleDisplayName: Rim
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:
           UIColorName: ""
         UIBackgroundModes: [audio]
@@ -69,6 +71,7 @@ targets:
       path: RimWidgets/Info.plist
       properties:
         CFBundleDisplayName: Rim
+        ITSAppUsesNonExemptEncryption: false
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

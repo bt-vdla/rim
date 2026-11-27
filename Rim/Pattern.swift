@@ -106,9 +106,24 @@ struct Feed {
         self.rounds = rounds
     }
 
+    /// Alternate nostril, corner to corner: up the left edge, across the top, down the right;
+    /// then back up the right, across, and down the left.
     private static let alternatePath: [(Double, Double)] = [
-        (0.625, 1.125), (1.125, 1.125), (0.125, 0.625), (0.625, 0.125), (0.125, 0.125), (1.125, 0.625),
+        (0.75, 1.0), (1.0, 1.25), (1.25, 1.5), (1.5, 1.25), (1.25, 1.0), (1.0, 0.75),
     ]
+
+    /// How many sides of the screen each phase travels. Whole sides only, so every phase starts and
+    /// ends on a corner: one side each, and spare sides go to the longest phases (later ones win ties).
+    static func sides(for beats: [Beat]) -> [Int] {
+        let n = beats.count
+        guard n < 4 else { return Array(repeating: 1, count: n) }
+        var spans = Array(repeating: 1, count: n)
+        let order = beats.indices.sorted {
+            beats[$0].seconds != beats[$1].seconds ? beats[$0].seconds > beats[$1].seconds : $0 > $1
+        }
+        for k in 0..<(4 - n) { spans[order[k % n]] += 1 }
+        return spans
+    }
 
     mutating func next() -> Step? {
         pattern.id == .rounds ? nextRound() : nextBeat()
@@ -122,16 +137,16 @@ struct Feed {
         let local = pattern.id == .urge && !opening ? index - sighs.count * 3 : index
         let i = local % beats.count
         let beat = beats[i]
-        let cycle = beats.reduce(0) { $0 + $1.seconds }
-        let before = beats.prefix(i).reduce(0) { $0 + $1.seconds }
+        let spans = Self.sides(for: beats)
+        let before = Double(spans.prefix(i).reduce(0, +))
         // Ease in: the first breaths run up to 30% quicker, settling on the set pace by the sixth.
         let settle = easeIn ? 1 + 0.3 * max(0, 1 - Double(index / beats.count) / 6) : 1
         var step = Step(phase: beat.phase, seconds: beat.seconds / (pace * settle), side: beat.side, word: Self.word(beat), topUp: beat.topUp)
         if pattern.id == .alternate {
             (step.from, step.to) = Self.alternatePath[i % 6]
         } else {
-            step.from = before / cycle
-            step.to = (before + beat.seconds) / cycle
+            step.from = before / 4
+            step.to = (before + Double(spans[i])) / 4
         }
         let nextIsTopUp = beats[(i + 1) % beats.count].topUp
         let target: Double = switch beat.phase {
@@ -160,19 +175,19 @@ struct Feed {
             let inhale = s % 2 == 0
             return Step(
                 phase: inhale ? .inhale : .exhale, seconds: (inhale ? 1.6 : 1.4) / pace,
-                from: 0.125, to: 0.125, fullFrom: inhale ? 0 : 1, fullTo: inhale ? 1 : 0,
+                from: 0, to: 0, fullFrom: inhale ? 0 : 1, fullTo: inhale ? 1 : 0,
                 word: inhale ? "Inhale" : "Exhale", endsBreath: !inhale, pulse: true, count: s / 2 + 1
             )
         }
         switch s - power {
         case 0:
-            return Step(phase: .holdOut, seconds: nil, from: 0.125, to: 0.125, word: "Hold", retention: true)
+            return Step(phase: .holdOut, seconds: nil, from: 0, to: 0, word: "Hold", retention: true)
         case 1:
-            return Step(phase: .inhale, seconds: 2.5, from: 0.125, to: 0.375, fullFrom: 0, fullTo: 1, word: "Inhale fully")
+            return Step(phase: .inhale, seconds: 2.5, from: 0, to: 0.25, fullFrom: 0, fullTo: 1, word: "Inhale fully")
         case 2:
-            return Step(phase: .holdIn, seconds: 15, from: 0.375, to: 1.375, fullFrom: 1, fullTo: 1, word: "Hold")
+            return Step(phase: .holdIn, seconds: 15, from: 0.25, to: 1.25, fullFrom: 1, fullTo: 1, word: "Hold")
         default:
-            return Step(phase: .exhale, seconds: 3, from: 1.375, to: 1.625, fullFrom: 1, fullTo: 0, word: "Exhale", endsBreath: true)
+            return Step(phase: .exhale, seconds: 3, from: 1.25, to: 1.5, fullFrom: 1, fullTo: 0, word: "Exhale", endsBreath: true)
         }
     }
 

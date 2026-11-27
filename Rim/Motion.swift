@@ -24,15 +24,14 @@ extension AnyTransition {
         )
     }
 
-    /// The pattern name after a swipe: an 8pt nudge in the swipe's direction, since the finger already moved it.
-    static func nudge(from edge: Edge, reduceMotion: Bool) -> AnyTransition {
-        guard !reduceMotion else { return .opacity }
-        let d: CGFloat = edge == .trailing ? 8 : -8
+    /// Swiping between patterns: the old name blurs away and the new one comes into focus, in place.
+    static func focus(reduceMotion: Bool) -> AnyTransition {
+        guard !reduceMotion else { return .opacity.animation(.easeOut(duration: 0.2)) }
         return .asymmetric(
-            insertion: .modifier(active: Drift(opacity: 0, blur: 4, x: d, y: 0), identity: Drift(opacity: 1, blur: 0, x: 0, y: 0))
-                .animation(.easeOut(duration: 0.3)),
-            removal: .modifier(active: Drift(opacity: 0, blur: 4, x: -d, y: 0), identity: Drift(opacity: 1, blur: 0, x: 0, y: 0))
-                .animation(.easeOut(duration: 0.15))
+            insertion: .modifier(active: Drift(opacity: 0, blur: 10, x: 0, y: 0), identity: Drift(opacity: 1, blur: 0, x: 0, y: 0))
+                .animation(.easeOut(duration: 0.4).delay(0.06)),
+            removal: .modifier(active: Drift(opacity: 0, blur: 10, x: 0, y: 0), identity: Drift(opacity: 1, blur: 0, x: 0, y: 0))
+                .animation(.easeOut(duration: 0.2))
         )
     }
 }

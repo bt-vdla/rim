@@ -120,6 +120,16 @@ import SwiftUI
         finish(at: clock)
     }
 
+    /// The swell under a hold-to-begin, the tap when it lands, or quiet if you let go early.
+    func holdHaptic(strength: Double, duration: Double) {
+        haptics.strength = Float(strength)
+        haptics.holdSwell(duration: duration)
+    }
+
+    func landHaptic() { haptics.tap() }
+
+    func cancelHaptics() { haptics.stop() }
+
     /// A sample breath for onboarding: an inhale swell, then an exhale fade, in haptics alone.
     func demoHaptics(strength: Double) {
         haptics.strength = Float(strength)
@@ -171,7 +181,7 @@ import SwiftUI
     }
 
     private func cue(_ step: Step, from progress: Double) {
-        haptics.play(step, from: progress)
+        haptics.play(step, from: progress, startTap: entries.count == 1 && progress == 0)
         tone.cue(step, from: progress)
         if let current, !step.pulse || step.count == 1 { live.update(liveState(current)) }
     }

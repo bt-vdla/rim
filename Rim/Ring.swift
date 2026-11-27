@@ -158,7 +158,7 @@ struct RingCanvas: View {
         let now = sample(date)
         let level = now.map { 0.42 + 0.58 * $0.full } ?? 0
         let pulse = max(still || now?.pulse == true ? level : 0, flash)
-        let bulge = (style == .trace ? 11 : 20) * (0.55 + 0.6 * (now?.full ?? 0))
+        let bulge = (style == .trace ? 9 : 15) * (0.55 + 0.6 * (now?.full ?? 0))
         let points = now.flatMap { pulse > 0 ? nil : trailPoints($0, level: level) } ?? [0, 0, 0]
 
         GeometryReader { proxy in
@@ -172,8 +172,8 @@ struct RingCanvas: View {
         .overlay {
             Canvas { ctx, _ in
                 if let side = now?.side, side != .both {
-                    let from = side == .left ? 0.625 : 0.125
-                    ctx.stroke(ring.span(from: from, by: 0.5),
+                    let from = side == .left ? 0.75 : 0.25
+                    ctx.stroke(ring.span(from: from, by: 0.25),
                                with: .color(.primary.opacity(0.18 * intensity)), lineWidth: 1)
                 }
                 if let progress, progress > 0 {
@@ -230,6 +230,8 @@ struct Backdrop: View {
     /// Where the light is, and how hard it pulls the colours toward it.
     var head: CGPoint = .zero
     var pull = 0.0
+    /// 0 to 1: the end-of-session fall into the light and fade to near-black.
+    var collapse = 0.0
 
     var body: some View {
         let t = still ? 40 : date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
@@ -237,9 +239,8 @@ struct Backdrop: View {
             Rectangle()
                 .colorEffect(ShaderLibrary.aurora(
                     .float2(proxy.size), .float(t), .float(full), .float(still ? 0 : full),
-                    .float2(head), .float(still ? 0 : pull),
-                    .color(colors[1]), .color(colors[0]), .color(colors[2]),
-                    .color(colors[1].mix(with: .black, by: 0.55))
+                    .float2(head), .float(still ? 0 : pull), .float(collapse),
+                    .color(colors[0]), .color(colors[1]), .color(colors[2]), .color(colors[3])
                 ))
         }
         .ignoresSafeArea()
