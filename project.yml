@@ -1,0 +1,76 @@
+name: Rim
+options:
+  bundleIdPrefix: com.bt
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  Rim:
+    type: application
+    platform: iOS
+    sources:
+      - path: Rim
+        excludes: ["Info.plist", "Rim.entitlements"]
+      - path: Shared
+    dependencies:
+      - target: RimWidgets
+    entitlements:
+      path: Rim/Rim.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
+        com.apple.security.application-groups: [group.com.bt.rim]
+    info:
+      path: Rim/Info.plist
+      properties:
+        CFBundleDisplayName: Rim
+        UILaunchScreen:
+          UIColorName: ""
+        UIBackgroundModes: [audio]
+        NSSupportsLiveActivities: true
+        NSHealthUpdateUsageDescription: Rim saves each session as Mindful Minutes.
+        NSHealthShareUsageDescription: Rim reads your heart rate from AirPods Pro during a session.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        CFBundleURLTypes:
+          - CFBundleURLName: com.bt.rim
+            CFBundleURLSchemes: [rim]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bt.rim
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  RimWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RimWidgets
+        excludes: ["Info.plist", "RimWidgets.entitlements"]
+      - path: Shared
+    entitlements:
+      path: RimWidgets/RimWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.bt.rim]
+    info:
+      path: RimWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Rim
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bt.rim.widgets

@@ -1,0 +1,8 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
+# iCloud Desktop duplicates
+* 2.*
+.DS_Store
