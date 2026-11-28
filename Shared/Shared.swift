@@ -8,10 +8,10 @@ enum PatternID: String, Codable, CaseIterable, AppEnum {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Pattern"
     static let caseDisplayRepresentations: [PatternID: DisplayRepresentation] = [
         .steady: "Steady", .sleep: "Sleep", .balance: "Balance", .reset: "Reset", .unwind: "Unwind",
-        .triangle: "Triangle", .alternate: "Alternate", .energize: "Energize", .rounds: "Wim Hof", .custom: "Custom", .urge: "Urge",
+        .triangle: "Triangle", .alternate: "Alternate", .energize: "Energize", .rounds: "Power", .custom: "Custom", .urge: "Urge",
     ]
 
-    var title: String { self == .rounds ? "Wim Hof" : rawValue.capitalized }
+    var title: String { self == .rounds ? "Power" : rawValue.capitalized }
 
     /// The patterns you swipe between. Urge has its own button.
     static var carousel: [PatternID] { allCases.filter { $0 != .urge } }

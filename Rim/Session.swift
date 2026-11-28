@@ -73,7 +73,7 @@ import SwiftUI
         tone.style = prefs.sound
         tone.volume = prefs.volume
         tone.start()
-        if prefs.heartRate { heart.start() }
+        if prefs.heartRate || Heart.faking { heart.start() }
         breaths = 0
         holds = []
         entries = []

@@ -133,7 +133,7 @@ struct RingPath {
 }
 
 /// The light on the edge, drawn by the `edgeLight` Metal shader: a thick band that swells into a bulge
-/// where the breath is, with a Canvas on top for the side highlight and breath dots.
+/// where the breath is, with a Canvas on top for the side highlight .
 struct RingCanvas: View {
     let ring: RingPath
     let radius: CGFloat
@@ -142,7 +142,6 @@ struct RingCanvas: View {
     let date: Date
     let trail: Double
     var intensity = 1.0
-    var dots = 0
     /// Where earlier holds ended this session, and the best hold ever, as positions on the lap.
     var marks: [Double] = []
     var best: Double?
@@ -183,14 +182,6 @@ struct RingCanvas: View {
                 }
                 for u in marks { tick(&ctx, at: u, color: colors[0].opacity(0.8 * intensity), length: 10) }
                 if let best { tick(&ctx, at: best, color: .white.opacity(0.95 * intensity), length: 16) }
-                for i in 0..<dots {
-                    let u = 0.125 + Double(i % 80) * 0.0125
-                    let inset = 22 + CGFloat(i / 80) * 8
-                    let p = ring.point(u), n = ring.normal(u)
-                    let c = CGPoint(x: p.x + n.dx * inset, y: p.y + n.dy * inset)
-                    ctx.fill(Path(ellipseIn: CGRect(x: c.x - 1.8, y: c.y - 1.8, width: 3.6, height: 3.6)),
-                             with: .color(.primary.opacity(0.5 * intensity)))
-                }
             }
         }
         .allowsHitTesting(false)
@@ -232,16 +223,27 @@ struct Backdrop: View {
     var pull = 0.0
     /// 0 to 1: the end-of-session fall into the light and fade to near-black.
     var collapse = 0.0
+    /// 0 to 1: the heartbeat, when AirPods are measuring one.
+    var beat = 0.0
+    /// Draw nested contour lines in the screen's shape instead of the gradient.
+    var contours = false
+    var radius: CGFloat = 55
 
     var body: some View {
         let t = still ? 40 : date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
         GeometryReader { proxy in
             Rectangle()
-                .colorEffect(ShaderLibrary.aurora(
-                    .float2(proxy.size), .float(t), .float(full), .float(still ? 0 : full),
-                    .float2(head), .float(still ? 0 : pull), .float(collapse),
-                    .color(colors[0]), .color(colors[1]), .color(colors[2]), .color(colors[3])
-                ))
+                .colorEffect(contours
+                    ? ShaderLibrary.contours(
+                        .float2(proxy.size), .float(t), .float(full), .float2(head), .float(still ? 0 : pull),
+                        .float(collapse), .float(still ? 0 : beat), .float(radius),
+                        .color(colors[0]), .color(colors[1]), .color(colors[2]), .color(colors[3])
+                    )
+                    : ShaderLibrary.aurora(
+                        .float2(proxy.size), .float(t), .float(full), .float(still ? 0 : full),
+                        .float2(head), .float(still ? 0 : pull), .float(collapse), .float(still ? 0 : beat),
+                        .color(colors[0]), .color(colors[1]), .color(colors[2]), .color(colors[3])
+                    ))
         }
         .ignoresSafeArea()
     }

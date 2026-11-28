@@ -3,7 +3,6 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
-    let openEditor: () -> Void
     let openHoldTest: () -> Void
     let openCalibrate: () -> Void
 
@@ -18,18 +17,6 @@ struct SettingsView: View {
                     if id == .rounds {
                         Stepper("^[\(store.prefs.rounds) round](inflect: true)", value: $store.prefs.rounds, in: 1...8)
                         Stepper("^[\(store.prefs.powerBreaths) breath](inflect: true) a round", value: $store.prefs.powerBreaths, in: 10...60, step: 5)
-                    } else {
-                        Picker("Length", selection: $store.prefs.length) {
-                            ForEach(LengthMode.allCases, id: \.self) { Text($0.title) }
-                        }
-                        switch store.prefs.length {
-                        case .minutes:
-                            Stepper("\(store.prefs.minutes) min", value: $store.prefs.minutes, in: 1...60)
-                        case .breaths:
-                            Stepper("^[\(store.prefs.breaths) breath](inflect: true)", value: $store.prefs.breaths, in: 3...200)
-                        case .open:
-                            EmptyView()
-                        }
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         LabeledContent("Pace", value: "\((pattern.cycle / store.pace(id)).clean) s a breath")
@@ -43,30 +30,27 @@ struct SettingsView: View {
                     }
                     if id != .rounds {
                         Button("Match my breathing") { openCalibrate() }
-                        Toggle("Ease into pace", isOn: $store.prefs.easeIn)
                     }
                     if id == .sleep {
                         Toggle("Fade the light after six breaths", isOn: $store.prefs.sleepFade)
                     }
-                    if pattern.editable {
-                        Button("Edit pattern") {
-                            openEditor()
-                        }
-                    }
                 }
 
-                Section {
+                Section("Session") {
+                    Picker("Length", selection: $store.prefs.length) {
+                        ForEach(LengthMode.allCases, id: \.self) { Text($0.title) }
+                    }
+                    switch store.prefs.length {
+                    case .minutes:
+                        Stepper("\(store.prefs.minutes) min", value: $store.prefs.minutes, in: 1...60)
+                    case .breaths:
+                        Stepper("^[\(store.prefs.breaths) breath](inflect: true)", value: $store.prefs.breaths, in: 3...200)
+                    case .open:
+                        EmptyView()
+                    }
+                    Toggle("Ease into pace", isOn: $store.prefs.easeIn)
                     Picker("Sound", selection: $store.prefs.sound) {
                         ForEach(SoundStyle.allCases, id: \.self) { Text($0.title) }
-                    }
-                    if store.prefs.sound != .off {
-                        Slider(value: $store.prefs.volume, in: 0...1) {
-                            Text("Volume")
-                        } minimumValueLabel: {
-                            Image(systemName: "speaker.fill")
-                        } maximumValueLabel: {
-                            Image(systemName: "speaker.wave.3.fill")
-                        }
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Haptics")
@@ -78,42 +62,38 @@ struct SettingsView: View {
                             Image(systemName: "iphone.radiowaves.left.and.right")
                         }
                     }
-                }
-
-                Section {
                     Picker("Light", selection: $store.prefs.ring) {
                         ForEach(RingStyle.allCases, id: \.self) { Text($0.title) }
+                    }
+                    Picker("Colour", selection: $store.prefs.palette) {
+                        ForEach(Palette.allCases, id: \.self) { Text($0.title) }
+                    }
+                    Picker("Background", selection: $store.prefs.backdrop) {
+                        ForEach(BackdropStyle.allCases, id: \.self) { Text($0.title) }
                     }
                     Picker("Words", selection: $store.prefs.words) {
                         ForEach(WordsMode.allCases, id: \.self) { Text($0.title) }
                     }
-                    Picker("Count", selection: $store.prefs.count) {
-                        ForEach(CountMode.allCases, id: \.self) { Text($0.title) }
-                    }
-                    Toggle("Warmer at night", isOn: $store.prefs.nightWarmth)
+                    Toggle("Count the seconds", isOn: countBinding)
                 }
 
                 Section {
                     NavigationLink("History") { HistoryView() }
                     Button("Breath-hold test") { openHoldTest() }
-                    Button("Replay onboarding") {
-                        store.prefs.onboarded = false
-                        dismiss()
-                    }
-                }
-
-                Section {
                     Toggle("Daily reminder", isOn: $store.prefs.reminder)
                     if store.prefs.reminder {
                         DatePicker("Time", selection: reminderTime, displayedComponents: .hourAndMinute)
                     }
                     Toggle("Save to Apple Health", isOn: $store.prefs.health)
-                }
-
-                Section {
                     Toggle("Heart rate from AirPods Pro", isOn: $store.prefs.heartRate)
+                    Button("Replay onboarding") {
+                        store.prefs.onboarded = false
+                        dismiss()
+                    }
+                } header: {
+                    Text("You")
                 } footer: {
-                    Text("Needs AirPods Pro 3.")
+                    Text("Heart rate needs AirPods Pro 3.")
                 }
             }
             .navigationTitle("Settings")
@@ -134,6 +114,10 @@ struct SettingsView: View {
 
     private func paceBinding(_ id: PatternID) -> Binding<Double> {
         Binding(get: { store.pace(id) }, set: { store.prefs.pace[id.rawValue] = $0 })
+    }
+
+    private var countBinding: Binding<Bool> {
+        Binding(get: { store.prefs.count == .number }, set: { store.prefs.count = $0 ? .number : .off })
     }
 
     private var reminderTime: Binding<Date> {

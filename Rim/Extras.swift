@@ -133,3 +133,55 @@ struct CalibrateView: View {
         .glassEffect(.regular.interactive(), in: .capsule)
     }
 }
+
+/// What a pattern is for and how to do it, opened by tapping a pattern at rest.
+struct AboutView: View {
+    let pattern: Pattern
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    var body: some View {
+        let about = pattern.id.about
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(pattern.name)
+                    .scaledFont(36, .medium)
+                    .tracking(-0.8)
+                    .textRenderer(LetterBlur(progress: shown || reduceMotion ? 1 : 0))
+                Text(pattern.detail)
+                    .font(.subheadline.weight(.medium))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Group {
+                    Text(about.what)
+                        .font(.body.weight(.medium))
+                        .padding(.top, 14)
+                    Text(about.how)
+                        .foregroundStyle(.secondary)
+                    Text("How it works")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.top, 14)
+                    Text(pattern.id.science)
+                        .foregroundStyle(.secondary)
+                    if pattern.intense {
+                        Text("Sit or lie down. Never in water or while driving. Stop if you feel light-headed.")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                    }
+                }
+                .opacity(shown || reduceMotion ? 1 : 0)
+                .blur(radius: shown || reduceMotion ? 0 : 6)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 28)
+            .padding(.top, 40)
+            .padding(.bottom, 40)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents([.medium, .large])
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.9).delay(0.15)) { shown = true }
+        }
+    }
+}

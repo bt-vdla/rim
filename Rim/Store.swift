@@ -4,7 +4,9 @@ enum LengthMode: String, Codable, CaseIterable { case minutes, breaths, open }
 enum SoundStyle: String, Codable, CaseIterable { case pluck, bowl, drone, off }
 enum RingStyle: String, Codable, CaseIterable { case comet, trace }
 enum WordsMode: String, Codable, CaseIterable { case always, first, off }
-enum CountMode: String, Codable, CaseIterable { case number, dots, off }
+enum CountMode: String, Codable, CaseIterable { case number, off }
+enum Palette: String, Codable, CaseIterable { case hue, heart }
+enum BackdropStyle: String, Codable, CaseIterable { case gradient, contours }
 
 struct Prefs: Codable {
     var selected: PatternID = .steady
@@ -20,7 +22,6 @@ struct Prefs: Codable {
     var ring: RingStyle = .comet
     var words: WordsMode = .always
     var count: CountMode = .number
-    var nightWarmth = true
     var reminder = false
     var reminderMinutes = 21 * 60
     var health = true
@@ -30,6 +31,8 @@ struct Prefs: Codable {
     var easeIn = true
     var sleepFade = true
     var heartRate = false
+    var palette: Palette = .hue
+    var backdrop: BackdropStyle = .gradient
 }
 
 /// Reads whatever was saved and keeps defaults for anything missing, so adding a setting never wipes the rest.
@@ -43,10 +46,10 @@ extension Prefs {
         read(.selected, \.selected); read(.length, \.length); read(.minutes, \.minutes); read(.breaths, \.breaths)
         read(.pace, \.pace); read(.rounds, \.rounds); read(.powerBreaths, \.powerBreaths); read(.sound, \.sound)
         read(.volume, \.volume); read(.haptics, \.haptics); read(.ring, \.ring); read(.words, \.words)
-        read(.count, \.count); read(.nightWarmth, \.nightWarmth); read(.reminder, \.reminder)
+        read(.count, \.count); read(.reminder, \.reminder)
         read(.reminderMinutes, \.reminderMinutes); read(.health, \.health); read(.onboarded, \.onboarded)
         read(.acknowledged, \.acknowledged); read(.beats, \.beats); read(.easeIn, \.easeIn)
-        read(.sleepFade, \.sleepFade); read(.heartRate, \.heartRate)
+        read(.sleepFade, \.sleepFade); read(.heartRate, \.heartRate); read(.palette, \.palette); read(.backdrop, \.backdrop)
         self = p
     }
 }
@@ -98,9 +101,20 @@ struct HoldResult: Codable, Identifiable {
 
     func pace(_ id: PatternID) -> Double { prefs.pace[id.rawValue] ?? 1 }
 
-    /// Palette for a pattern, warmed late in the evening when the setting is on.
+    /// Colours warmed late in the evening by the clock.
+    func warmed(_ colors: [Color], at date: Date = .now) -> [Color] {
+        let hour = Calendar.current.component(.hour, from: date)
+        let (tint, amount): (UInt32, Double) = switch hour {
+        case 23, 0..<5: (0xFF5A4A, 0.45)
+        case 21, 22: (0xFFB36B, 0.25)
+        default: (0, 0)
+        }
+        guard amount > 0 else { return colors }
+        return colors.map { $0.mix(with: Color(hex: tint), by: amount) }
+    }
+
+    /// Palette for a pattern, warmed late in the evening by the clock.
     func colors(_ id: PatternID, at date: Date = .now) -> [Color] {
-        guard prefs.nightWarmth else { return id.colors }
         let hour = Calendar.current.component(.hour, from: date)
         let (tint, amount): (UInt32, Double) = switch hour {
         case 23, 0..<5: (0xFF5A4A, 0.45)
@@ -123,7 +137,8 @@ struct HoldResult: Codable, Identifiable {
 extension LengthMode { var title: String { rawValue.capitalized } }
 extension SoundStyle { var title: String { rawValue.capitalized } }
 extension RingStyle { var title: String { rawValue.capitalized } }
-extension CountMode { var title: String { rawValue.capitalized } }
+extension Palette { var title: String { self == .hue ? "One hue" : "Heart rate" } }
+extension BackdropStyle { var title: String { self == .gradient ? "Gradient" : "Contour lines" } }
 
 extension WordsMode {
     var title: String {

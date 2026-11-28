@@ -12,6 +12,7 @@ struct BreatheView: View {
     @State private var blendEpoch = Date.now
     @State private var showSettings = false
     @State private var editing: Pattern?
+    @State private var about: Pattern?
     @State private var holdTest = false
     @State private var safety: Pattern?
     @State private var epoch = Date.now
@@ -36,7 +37,6 @@ struct BreatheView: View {
     }
 
     private var pattern: Pattern { session.pattern ?? safety ?? session.summary?.pattern ?? store.selected }
-    private var colors: [Color] { store.colors(pattern.id) }
     private var style: RingStyle { store.prefs.ring }
 
     var body: some View {
@@ -80,13 +80,13 @@ struct BreatheView: View {
         .sensoryFeedback(.selection, trigger: store.prefs.selected)
         .sheet(isPresented: $showSettings) {
             SettingsView(
-                openEditor: { present { editing = store.selected } },
                 openHoldTest: { present { holdTest = true } },
                 openCalibrate: { present { calibrating = true } }
             )
         }
         .fullScreenCover(isPresented: $calibrating) { CalibrateView(pattern: store.selected) }
         .sheet(item: $editing) { EditorView(pattern: $0) }
+        .sheet(item: $about) { AboutView(pattern: $0) }
         .fullScreenCover(isPresented: $holdTest) { HoldTestView() }
         .onChange(of: session.summary?.id) { old, new in
             if old != nil, new == nil { summaryClosed = .now }
@@ -146,20 +146,25 @@ struct BreatheView: View {
         // The light goes dark at the crossover and comes back on the new pattern, so it never jumps.
         let dip = from == nil ? 1 : 1 - sin(.pi * k)
         let falling = collapse(at: date)
+        // With AirPods measuring, the heartbeat leads the gradient and the breath steps back.
+        let heart = live ? session.heart.pulse(at: date) : (beat: 0.0, weight: 0.0)
         ZStack {
             Backdrop(
-                colors: mixed(from?.backdrop, pattern.id.backdrop, k), full: now?.full ?? 0, date: date, still: reduceMotion,
+                colors: mixed(from.map { backdropPalette($0, date) }, backdropPalette(pattern.id, date), k), full: (now?.full ?? 0) * (1 - 0.6 * heart.weight),
+                date: date, still: reduceMotion,
                 head: falling > 0 && session.summary != nil ? ring.point(session.endU) : now.map { ring.point($0.u) } ?? .zero,
                 pull: now == nil || now?.pulse == true || reduceMotion ? 0
                     : (live || closing ? 0.2 + 0.3 * (now?.full ?? 0) : 0.15),
-                collapse: falling
+                collapse: falling,
+                beat: heart.beat * heart.weight,
+                contours: store.prefs.backdrop == .contours,
+                radius: radius
             )
             RingCanvas(
-                ring: ring, radius: radius, colors: mixed(from.map { store.colors($0) }, colors, k), style: style,
+                ring: ring, radius: radius, colors: mixed(from.map { ringPalette($0, date) }, ringPalette(pattern.id, date), k), style: style,
                 date: clock, trail: trail,
                 intensity: (mode == .running || closing ? 1 : mode == .paused ? 0.45 : mode == .welcome ? 0.85 : 0.55)
                     * fade * dip * (1 - 0.85 * falling),
-                dots: store.prefs.count == .dots && live ? session.breaths : 0,
                 marks: rounds ? session.holds.map { 0.125 + $0 / 60 } : [],
                 best: rounds ? bestHold.map { 0.125 + $0 / 60 } : nil,
                 progress: live ? session.progress : nil,
@@ -168,9 +173,55 @@ struct BreatheView: View {
                 sample: from != nil && k < 0.5 && !live && !closing ? oldSample : sample
             )
             center(date: date)
-                .padding(.horizontal, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: editorial ? .bottomLeading : .center)
+                .padding(.horizontal, editorial ? 32 : 40)
+                .padding(.bottom, editorial ? 224 : 0)
+                .animation(.smooth(duration: 0.5), value: editorial)
+            if live, session.heart.bpm != nil || session.heart.waiting {
+                heartRate(session.heart.bpm, beat: heart.beat * heart.weight)
+            }
             Color.black.opacity((1 - fade) * 0.94).allowsHitTesting(false)
         }
+    }
+
+    // MARK: Theme
+
+    /// Rest, sessions and the summary sit bottom-left, editorial style; onboarding stays centred.
+    private var editorial: Bool {
+        [.idle, .running, .paused, .summary].contains(mode)
+    }
+
+    /// The pattern's own hue, or with Heart rate on and a live reading, a hue that follows the heart.
+    private func hue(_ id: PatternID) -> Color {
+        guard store.prefs.palette == .heart, session.state != .idle, let bpm = session.heart.bpm else { return id.backdrop[1] }
+        return Self.heartHue(bpm)
+    }
+
+    private func backdropPalette(_ id: PatternID, _ date: Date) -> [Color] {
+        Self.oneHue(hue(id), ring: false)
+    }
+
+    private func ringPalette(_ id: PatternID, _ date: Date) -> [Color] {
+        store.warmed(Self.oneHue(hue(id), ring: true), at: date)
+    }
+
+    /// One colour in light and dark steps: a deep base, the colour itself, a pale and a dim version.
+    private static func oneHue(_ color: Color, ring: Bool) -> [Color] {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        if ring {
+            return [Color(hue: h, saturation: s * 0.25, brightness: 1), Color(hue: h, saturation: s * 0.6, brightness: 1),
+                    Color(hue: h, saturation: s, brightness: 0.9)]
+        }
+        return [Color(hue: h, saturation: s, brightness: 0.16), Color(hue: h, saturation: s * 0.95, brightness: 0.62),
+                Color(hue: h, saturation: s * 0.55, brightness: 0.85), Color(hue: h, saturation: s * 0.8, brightness: 0.42)]
+    }
+
+    /// Teal at 58 bpm or below, turning through blue and violet to red at 92 and above.
+    /// The hue moves around the wheel rather than mixing, so it never passes through grey.
+    private static func heartHue(_ bpm: Double) -> Color {
+        let k = min(1, max(0, (bpm - 58) / 34))
+        return Color(hue: 0.48 + 0.52 * k, saturation: 0.85, brightness: 0.95)
     }
 
     // MARK: Blending between patterns
@@ -192,7 +243,7 @@ struct BreatheView: View {
         return Preview(store.pattern(blendFrom), pace: store.pace(blendFrom)).moment(date.timeIntervalSince(blendEpoch))
     }
 
-    /// The best Wim Hof hold ever, from history and this session.
+    /// The best Power hold ever, from history and this session.
     private var bestHold: Double? { (store.records.flatMap(\.holds) + session.holds).max() }
 
     /// In Sleep, after six breaths the light fades to black over 30 seconds while the sound carries on.
@@ -261,7 +312,7 @@ struct BreatheView: View {
 
     @ViewBuilder
     private func center(date: Date) -> some View {
-        VStack(spacing: 10) {
+        VStack(alignment: editorial ? .leading : .center, spacing: 10) {
             switch mode {
             case .welcome:
                 let page = Self.welcome[welcomeStep]
@@ -271,11 +322,11 @@ struct BreatheView: View {
                         .tracking(-0.6)
                     Text(page.body)
                         .font(.body.weight(.medium))
-                        .opacity(0.7)
+                        .foregroundStyle(.secondary)
                     if welcomeStep == 3 {
                         VStack(spacing: 4) {
                             Text(pattern.name).font(.title2.weight(.semibold))
-                            Text(pattern.detail).font(.subheadline.weight(.medium)).monospacedDigit().opacity(0.6)
+                            Text(pattern.detail).font(.subheadline.weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
                         }
                         .padding(.top, 22)
                         .id(pattern.id)
@@ -285,40 +336,36 @@ struct BreatheView: View {
                 }
                 .multilineTextAlignment(.center)
                 .id(welcomeStep)
-                .transition(.swap(reduceMotion: reduceMotion))
+                .transition(.letters(reduceMotion: reduceMotion))
             case .safety:
                 VStack(spacing: 14) {
-                    Text(pattern.name).scaledFont(40, .medium)
+                    Text(pattern.name).scaledFont(44, .medium).tracking(-0.8)
                     Text("Sit or lie down. Never in water or while driving. Stop if you feel light-headed.")
                         .font(.body.weight(.medium))
                         .multilineTextAlignment(.center)
-                        .opacity(0.75)
+                        .foregroundStyle(.secondary)
                 }
-                .transition(.swap(reduceMotion: reduceMotion))
+                .transition(.letters(reduceMotion: reduceMotion))
             case .summary where (finaleAge(date) ?? .infinity) < 1.1:
                 EmptyView()
             case .summary:
                 if urgeSummary {
-                    Text("Did it pass?").scaledFont(40, .medium).transition(.swap(reduceMotion: reduceMotion))
+                    Text("Did it pass?").scaledFont(44, .medium).tracking(-0.8).transition(.letters(reduceMotion: reduceMotion))
                 } else if let summary = session.summary {
                     SummaryText(summary: summary).transition(.swap(reduceMotion: reduceMotion))
                 }
             case .idle:
-                VStack(spacing: 8) {
+                VStack(alignment: editorial ? .leading : .center, spacing: 8) {
                     Text(pattern.name)
                         .scaledFont(46, .medium)
-                        .tracking(-1)
+                        .tracking(-1.2)
                     Text(pattern.detail)
                         .font(.subheadline.weight(.medium))
                         .monospacedDigit()
-                        .opacity(0.6)
-                    Text("Hold to begin")
-                        .font(.footnote.weight(.semibold))
-                        .opacity(0.5)
-                        .padding(.top, 18)
+                        .foregroundStyle(.secondary)
                 }
                 .id(pattern.id)
-                .transition(.focus(reduceMotion: reduceMotion))
+                .transition(.letters(reduceMotion: reduceMotion))
                 .modifier(DragSoften(x: dragX, reduceMotion: reduceMotion))
             case .running, .paused:
                 if let entry = session.current { running(entry, date: date) }
@@ -334,50 +381,73 @@ struct BreatheView: View {
     private func running(_ entry: Session.Entry, date: Date) -> some View {
         let step = entry.step
         if mode == .paused {
-            Text("Paused").scaledFont(40, .medium).transition(.swap(reduceMotion: reduceMotion))
+            Text("Paused").scaledFont(44, .medium).tracking(-0.8).transition(.letters(reduceMotion: reduceMotion))
         } else if step.retention {
             Text(Duration.seconds(date.timeIntervalSince(entry.start)).formatted(.time(pattern: .minuteSecond)))
-                .scaledFont(64, .regular).monospacedDigit()
-            Text("Tap to breathe").font(.footnote.weight(.medium)).opacity(0.6)
+                .scaledFont(68, .light).monospacedDigit()
+            Text("Tap to breathe").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
         } else {
             let words = store.prefs.words == .always || (store.prefs.words == .first && session.activeSeconds < 60)
             if words {
                 Text(step.word)
-                    .scaledFont(40, .medium)
+                    .scaledFont(44, .medium)
+                    .tracking(-0.8)
                     .id(step.word)
-                    .transition(.swap(reduceMotion: reduceMotion))
+                    .transition(.letters(reduceMotion: reduceMotion))
+                if let cue = step.cue {
+                    Text(cue)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .id(cue)
+                        .transition(.swap(reduceMotion: reduceMotion))
+                }
             }
             if pattern.id == .urge, let prompt = groundingPrompt {
                 Text(prompt)
                     .font(.body.weight(.medium))
                     .multilineTextAlignment(.center)
-                    .opacity(0.75)
+                    .foregroundStyle(.secondary)
                     .padding(.top, 8)
                     .id(prompt)
                     .transition(.swap(reduceMotion: reduceMotion))
             }
-            if let bpm = session.heart.bpm {
-                Label("\(Int(bpm))", systemImage: "heart.fill")
-                    .font(.footnote.weight(.semibold).monospacedDigit())
-                    .contentTransition(.numericText())
-                    .opacity(0.6)
-                    .accessibilityLabel("Heart rate \(Int(bpm))")
-            }
             if let count = step.count {
                 Text("\(count)")
-                    .scaledFont(22, .semibold).monospacedDigit()
+                    .scaledFont(22, .medium).monospacedDigit()
                     .contentTransition(.numericText())
-                    .opacity(0.6)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
             } else if store.prefs.count == .number, let seconds = step.seconds {
                 // Counts the seconds of the phase: 1, 2, 3, 4.
                 let n = min(Int(session.clock.timeIntervalSince(entry.start)) + 1, Int(seconds.rounded(.up)))
                 Text("\(n)")
-                    .scaledFont(26, .semibold).monospacedDigit()
+                    .scaledFont(22, .medium).monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.smooth(duration: 0.3), value: n)
-                    .opacity(0.65)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
             }
         }
+    }
+
+    /// Live heart rate at the foot of the screen; the heart beats with the gradient.
+    private func heartRate(_ bpm: Double?, beat: Double) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "heart.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .scaleEffect(reduceMotion ? 1 : 1 + 0.18 * beat)
+            Text(bpm.map { "\(Int($0))" } ?? "--")
+                .font(.system(size: 28, weight: .light).monospacedDigit())
+                .contentTransition(.numericText())
+                .animation(.smooth(duration: 0.4), value: bpm.map(Int.init))
+            Text("bpm")
+                .font(.footnote.weight(.semibold))
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 56)
+        .transition(.swap(reduceMotion: reduceMotion))
+        .allowsHitTesting(false)
     }
 
     // MARK: VoiceOver
@@ -397,7 +467,8 @@ struct BreatheView: View {
             if entry.step.retention {
                 return "Hold, \(Int(session.clock.timeIntervalSince(entry.start))) seconds"
             }
-            return entry.step.word
+            let heart = session.heart.bpm.map { ", heart rate \(Int($0))" } ?? ""
+            return entry.step.word + (entry.step.cue.map { ", \($0)" } ?? "") + heart
         }
     }
 
@@ -416,6 +487,7 @@ struct BreatheView: View {
             Button("End session") { session.end() }
         case .idle, .summary:
             Button("Begin") { begin(pattern) }
+            Button("About this pattern") { about = pattern }
             Button("Next pattern") { shift(1) }
             Button("Previous pattern") { shift(-1) }
         case .welcome where welcomeStep == 2:
@@ -434,7 +506,7 @@ struct BreatheView: View {
         ("Follow the light.", "It travels the edge of your screen, one breath at a time."),
         ("Feel the phone.", "It swells as you breathe in and settles as you breathe out."),
         ("Hold to begin.", "Press and hold anywhere. Tap anytime to pause."),
-        ("Choose a rhythm.", "Swipe to look around."),
+        ("Choose a rhythm.", "Swipe to look around. Tap to learn more."),
         ("A nudge each evening?", "One reminder at 9 pm."),
     ]
 
@@ -488,7 +560,15 @@ struct BreatheView: View {
         }
         .safeAreaInset(edge: .top, spacing: 22) {
             if mode == .idle || (mode == .summary && !urgeSummary) || (mode == .welcome && welcomeStep == 3) {
-                stepper.transition(.swap(reduceMotion: reduceMotion))
+                VStack(spacing: 14) {
+                    stepper
+                    if mode == .idle {
+                        Text("Hold anywhere to begin")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .transition(.swap(reduceMotion: reduceMotion))
             }
         }
         .frame(maxHeight: .infinity, alignment: .bottom)
@@ -498,27 +578,12 @@ struct BreatheView: View {
         .animation(.smooth(duration: 0.45), value: pattern.editable)
     }
 
-    /// One dot per pattern; the current one stretches into a pill. Tap a dot to jump to it.
     private var stepper: some View {
         let all = PatternID.carousel
         let index = all.firstIndex(of: store.prefs.selected) ?? 0
-        return HStack(spacing: 0) {
-            ForEach(all, id: \.self) { id in
-                let current = id == store.prefs.selected
-                Capsule()
-                    .fill(.white.opacity(current ? 0.95 : 0.32))
-                    .frame(width: current ? 20 : 7, height: 7)
-                    .frame(width: current ? 32 : 24)
-                    .frame(height: 34)
-                    .contentShape(Rectangle())
-                    .onTapGesture { shift((all.firstIndex(of: id) ?? index) - index) }
-            }
+        return PatternDial(selected: store.prefs.selected) { id in
+            shift((all.firstIndex(of: id) ?? index) - index)
         }
-        .padding(.horizontal, 10)
-        .contentShape(.capsule)
-        .onTapGesture {}
-        .glassEffect(.regular.interactive(), in: .capsule)
-        .animation(.spring(duration: 0.35, bounce: 0), value: store.prefs.selected)
         .accessibilityElement()
         .accessibilityLabel("Pattern")
         .accessibilityValue("\(index + 1) of \(all.count), \(store.prefs.selected.title)")
@@ -584,7 +649,8 @@ struct BreatheView: View {
                     .glassEffect(.regular.interactive(), in: .circle)
                     .glassEffectID("share", in: glass)
                     .accessibilityLabel("Share session")
-                } else if mode == .idle, pattern.editable {
+                }
+                if mode == .idle, pattern.editable {
                     circle("pencil", label: "Edit pattern", id: "edit", size: 48) { editing = pattern }
                 }
                 if mode == .idle || mode == .summary {
@@ -647,7 +713,8 @@ struct BreatheView: View {
 
     private func tap() {
         switch mode {
-        case .idle: break
+        case .idle: about = pattern
+        case .welcome where welcomeStep == 3: about = pattern
         case .summary: withAnimation(.smooth(duration: 0.5)) { session.summary = nil }
         case .running: session.current?.step.retention == true ? session.breathe() : session.pause()
         case .paused: session.resume()
@@ -727,7 +794,7 @@ struct SummaryText: View {
     var body: some View {
         VStack(spacing: 12) {
             reveal(0, Text(Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond)))
-                .scaledFont(64, .regular).monospacedDigit()
+                .scaledFont(68, .light).monospacedDigit()
                 .contentTransition(.numericText()))
             reveal(1, Text("^[\(breaths) breath](inflect: true)")
                 .font(.title3.weight(.medium))
@@ -735,14 +802,14 @@ struct SummaryText: View {
             if !summary.holds.isEmpty {
                 reveal(2, Text("Holds \(summary.holds.map { Duration.seconds($0).formatted(.time(pattern: .minuteSecond)) }.formatted(.list(type: .and)))")
                     .font(.subheadline.weight(.medium).monospacedDigit())
-                    .opacity(0.7))
+                    .foregroundStyle(.secondary))
             }
             if let heart = summary.heart {
                 reveal(3, Text("Heart \(Int(heart.start)) → \(Int(heart.end)) bpm")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .opacity(0.75))
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.secondary))
             }
-            reveal(4, Text(summary.pattern.name).font(.subheadline.weight(.medium)).opacity(0.5))
+            reveal(4, Text(summary.pattern.name).font(.subheadline.weight(.medium)).foregroundStyle(.secondary))
         }
         .onAppear {
             shown = true
@@ -773,5 +840,124 @@ private struct DragSoften: ViewModifier {
             .offset(x: reduceMotion ? 0 : x * 0.18)
             .blur(radius: reduceMotion ? 0 : min(abs(x) / 30, 8))
             .opacity(1 - min(abs(x) / 260, 0.65))
+    }
+}
+
+/// The pattern dial: one coloured bar per pattern. A small glass lens rests around the chosen bar; as you
+/// drag it swells into a wider lens that magnifies and bends the bars beneath and names the pattern.
+struct PatternDial: View {
+    let selected: PatternID
+    let select: (PatternID) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dragX: CGFloat?
+
+    static let width: CGFloat = 330
+    static let height: CGFloat = 64
+    private static let open = CGSize(width: 104, height: 52)
+    private static let resting = CGSize(width: 20, height: 40)
+    private let all = PatternID.carousel
+    private var pad: CGFloat { Self.open.width / 2 + 6 }
+    private var slot: CGFloat { (Self.width - 2 * pad) / CGFloat(all.count - 1) }
+
+    var body: some View {
+        let index = all.firstIndex(of: selected) ?? 0
+        let x = dragX.map { min(max($0, pad), Self.width - pad) } ?? pad + CGFloat(index) * slot
+        let tint = selected.colors[1]
+        let lifted = dragX != nil
+        let lens = lifted ? Self.open : Self.resting
+        ZStack {
+            Capsule()
+                .fill(.black.opacity(0.55))
+                .overlay(Capsule().strokeBorder(.white.opacity(0.08), lineWidth: 1))
+            bars
+                .modifier(Lens(x: x, y: Self.height / 2, width: lens.width, height: lens.height, lift: lifted ? 1 : 0, enabled: !reduceMotion))
+            Capsule()
+                .fill(.white.opacity(0.05))
+                .overlay(alignment: .top) {
+                    // A soft sheen along the top, where light would catch curved glass.
+                    Capsule()
+                        .fill(LinearGradient(colors: [.white.opacity(0.14), .clear], startPoint: .top, endPoint: .bottom))
+                        .frame(height: lens.height * 0.45)
+                        .padding(.horizontal, lens.width * 0.12)
+                        .padding(.top, 2)
+                }
+                .overlay(
+                    Capsule().strokeBorder(
+                        LinearGradient(colors: [tint, .white.opacity(0.1), tint.opacity(0.55)], startPoint: .top, endPoint: .bottom),
+                        lineWidth: 1.2
+                    )
+                )
+                .overlay(alignment: .top) {
+                    if lifted {
+                        Text(selected.title)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(tint)
+                            .fixedSize()
+                            .contentTransition(.numericText())
+                            .padding(.top, 6)
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)).animation(.smooth(duration: 0.25)))
+                    }
+                }
+                .overlay {
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: 5, height: 22)
+                        .shadow(color: tint.opacity(0.8), radius: 6)
+                        .offset(y: lifted ? 10 : 0)
+                }
+                .frame(width: lens.width, height: lens.height)
+                .position(x: x, y: Self.height / 2)
+        }
+        .frame(width: Self.width, height: Self.height)
+        .contentShape(.capsule)
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.82)) { dragX = value.location.x }
+                let clamped = min(max(value.location.x, pad), Self.width - pad)
+                let i = Int(((clamped - pad) / slot).rounded())
+                if all[i] != selected { select(all[i]) }
+            }
+            .onEnded { _ in
+                withAnimation(.spring(duration: 0.55, bounce: 0.3)) { dragX = nil }
+            })
+        .animation(.smooth(duration: 0.3), value: selected)
+    }
+
+    private var bars: some View {
+        Canvas { ctx, size in
+            for (i, id) in all.enumerated() {
+                let x = pad + CGFloat(i) * slot
+                let rect = CGRect(x: x - 1.25, y: size.height / 2 - 7, width: 2.5, height: 14)
+                ctx.fill(Path(roundedRect: rect, cornerRadius: 1.25), with: .color(id.colors[1]))
+            }
+        }
+    }
+}
+
+/// Feeds the lens shader its position and size every frame, so the refraction moves with the glass.
+private struct Lens: ViewModifier, Animatable {
+    var x: CGFloat
+    let y: CGFloat
+    var width: CGFloat
+    var height: CGFloat
+    var lift: CGFloat
+    let enabled: Bool
+
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { .init(.init(x, width), .init(height, lift)) }
+        set {
+            x = newValue.first.first
+            width = newValue.first.second
+            height = newValue.second.first
+            lift = newValue.second.second
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content.layerEffect(
+            ShaderLibrary.lens(.float2(x, y), .float2(width, height), .float(lift)),
+            maxSampleOffset: CGSize(width: 40, height: 40),
+            isEnabled: enabled
+        )
     }
 }
